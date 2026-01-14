@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>訂單金額統計助手 - 星星櫻桃版</title>
+    <style>
+        /* --- 1. 變數與基礎設定 --- */
+        :root {
+            --primary-pink: #ff85a2;
+            --hover-pink: #ff6b8e;
+            --light-pink: #ffb3c6;
+            --bg-pink: #fdfafb;
+            --text-brown: #5d4037;
+            --accent-pink: #fce4ec;
+            --border-pink: #f8e1e7;
+            --white: #ffffff;
+        }
+
+        body { 
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif; 
+            max-width: 540px; 
+            margin: 20px auto; 
+            padding: 15px; 
+            line-height: 1.6; 
+            background-color: var(--bg-pink); 
+            color: var(--text-brown); 
+        }
+
+        /* --- 2. 容器與區塊 --- */
+        .container { 
+            background: var(--white); 
+            padding: 25px; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 30px rgba(255, 133, 162, 0.15); 
+        }
+
+        h2 { 
+            text-align: center; 
+            margin-top: 0; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 10px; 
+            color: var(--primary-pink); 
+            font-size: 22px; 
+        }
+
+        .hint { 
+            color: #8d6e63; 
+            font-size: 13px; 
+            margin-bottom: 15px; 
+            text-align: center; 
+            background: #fff5f7; 
+            padding: 10px; 
+            border-radius: 12px; 
+            border: 1px solid #ffdde1; 
+        }
+
+        /* --- 3. 輸入控制項 --- */
+        textarea { 
+            width: 100%; 
+            height: 200px; 
+            padding: 15px; 
+            border: 2px solid var(--border-pink); 
+            border-radius: 15px; 
+            font-size: 15px; 
+            margin-bottom: 15px; 
+            box-sizing: border-box; 
+            resize: vertical; 
+            transition: all 0.3s; 
+            background-color: #fffafb; 
+        }
+
+        textarea:focus { 
+            outline: none; 
+            border-color: var(--primary-pink); 
+            background-color: var(--white); 
+            box-shadow: 0 0 8px rgba(255, 133, 162, 0.2); 
+        }
+
+        /* --- 4. 按鈕樣式 --- */
+        .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+        
+        button { 
+            flex: 1; 
+            min-width: 100px; 
+            padding: 12px 8px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 14px; 
+            font-weight: bold; 
+            transition: all 0.2s; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 5px; 
+        }
+        
+        button:hover { transform: translateY(-2px); }
+
+        .process-btn { background-color: var(--primary-pink); color: var(--white); }
+        .process-btn:hover { background-color: var(--hover-pink); box-shadow: 0 5px 15px rgba(255, 133, 162, 0.3); }
+        
+        .copy-btn { background-color: var(--light-pink); color: var(--white); }
+        .copy-btn:hover { background-color: #ffa39e; box-shadow: 0 5px 15px rgba(255, 183, 178, 0.3); }
+        
+        .clear-btn { background-color: var(--accent-pink); color: #d81b60; border: 1px solid #f8bbd0; }
+        .clear-btn:hover { background-color: #f8bbd0; }
+
+        /* --- 5. 結果顯示區 --- */
+        #resultArea { margin-top: 25px; display: none; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(15px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+
+        .group-section { 
+            margin-bottom: 25px; 
+            border: 2px solid #fff0f3; 
+            border-radius: 16px; 
+            overflow: hidden; 
+            background: var(--white); 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.02); 
+        }
+
+        .group-header { 
+            background: #fff0f3; 
+            padding: 10px 15px; 
+            font-weight: bold; 
+            border-bottom: 1px solid #ffe1e9; 
+            display: flex; 
+            justify-content: space-between; 
+            color: #ff5c8d; 
+            font-size: 15px; 
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { background-color: #fffafb; color: #a1887f; font-weight: 600; padding: 10px; border-bottom: 1px solid #fff0f3; font-size: 13px; }
+        td { padding: 10px; border-bottom: 1px solid #fffafa; font-size: 14px; color: var(--text-brown); }
+        
+        .item-col { text-align: left; padding-left: 20px; } 
+        .qty-col { width: 60px; text-align: center; }
+
+        /* --- 6. 最終統計卡片 --- */
+        .summary-card { 
+            background: var(--light-pink); 
+            color: var(--white); 
+            padding: 20px; 
+            border-radius: 20px; 
+            margin-top: 25px; 
+            box-shadow: 0 10px 25px rgba(255, 179, 198, 0.2);
+            border: 3px solid var(--white);
+        }
+
+        .summary-title { 
+            font-size: 17px; 
+            margin-bottom: 12px; 
+            border-bottom: 2px dashed rgba(255,255,255,0.6); 
+            padding-bottom: 8px; 
+            font-weight: bold; 
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            color: #c2185b; 
+        }
+
+        .summary-row { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 6px; 
+            font-size: 15px; 
+            font-weight: bold; 
+            color: var(--text-brown); 
+        }
+
+        .summary-item-name { text-align: left; flex: 1; }
+        
+        .grand-total-qty { 
+            font-size: 18px; 
+            margin-top: 12px; 
+            border-top: 2px dashed rgba(255,255,255,0.6); 
+            padding-top: 8px;
+        }
+
+        .grand-total { 
+            font-size: 30px; 
+            color: #d81b60; 
+            font-weight: 900; 
+            margin-top: 5px; 
+            text-shadow: 1px 1px 0px rgba(255,255,255,0.5);
+        }
+
+        /* --- 7. 其他 --- */
+        .toast { 
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); 
+            background: rgba(0,0,0,0.7); color: var(--white); 
+            padding: 8px 20px; border-radius: 25px; 
+            display: none; z-index: 1000; font-weight: bold; font-size: 14px; 
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>訂單分組統計助手</h2>
+    <div class="hint">
+        🎀 支援格式：使用 <b>++群組名稱++</b> 分組，內容為 <b>姓名-餐點 價格</b>
+    </div>
+    
+    <textarea id="inputData" placeholder="請貼上訂單資料，例如：
+
+++總管處++
+柏鋒-藥膳鍋燒泡飯 115
+怡嫻-原味鍋燒湯 120
+
+++湖美店++
+小玟-泡菜冬粉(X海鮮) 120
+孟諺-原味鍋燒湯 120"></textarea>
+    
+    <div class="btn-group">
+        <button class="process-btn" onclick="handleProcess()">✨ 開始統計</button>
+        <button class="copy-btn" onclick="handleCopy()">⭐ 複製文字</button>
+        <button class="clear-btn" onclick="handleClear()">🗑️ 清除</button>
+    </div>
+
+    <div id="resultArea">
+        <div id="groupsContainer"></div>
+
+        <div class="summary-card">
+            <div class="summary-title">全部最終統計</div>
+            <div id="overallStats"></div>
+            
+            <div class="summary-row grand-total-qty">
+                <span>總份數：</span>
+                <span id="totalQty">0 份</span>
+            </div>
+            <div class="summary-row grand-total">
+                <span>總金額：</span>
+                <span id="totalAmount">$0</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+    /* --- 常數與設定 --- */
+    const KEYWORDS_TO_SPACE = /(無糖|微糖|一分糖|二分糖|三分糖|半糖|少糖|七分糖|去冰|微冰|少冰|多冰|正常|熱|半飯)/g;
+
+    /* --- 通用工具函數 --- */
+    const formatNum = (num) => num.toLocaleString();
+    const chineseSort = (a, b) => a.localeCompare(b, 'zh-Hant');
+    
+    const showToast = (msg) => {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 2000);
+    };
+
+    /* --- 資料處理邏輯 --- */
+    function parseOrderData(input) {
+        const lines = input.split('\n');
+        const groups = {};
+        let currentGroupName = "未分類";
+        let stats = { totalQty: 0, totalAmount: 0 };
+
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+
+            // 檢查是否為群組標頭
+            const groupMatch = trimmed.match(/^\+\+(.*?)\+\+$/);
+            if (groupMatch) {
+                currentGroupName = groupMatch[1].trim();
+                return;
+            }
+
+            // 檢查是否為訂單行 (包含 - )
+            if (trimmed.includes('-')) {
+                const parts = trimmed.split('-');
+                const content = parts.slice(1).join('-').trim();
+                const match = content.match(/^(.*?)(\d+)$/);
+
+                if (match) {
+                    let itemName = match[1].trim();
+                    const price = parseInt(match[2], 10);
+
+                    // 格式化關鍵字間隔
+                    itemName = itemName.replace(/([^\s])/ + KEYWORDS_TO_SPACE.source, '$1 $2').replace(/\s+/g, ' ');
+
+                    // 初始化群組
+                    if (!groups[currentGroupName]) {
+                        groups[currentGroupName] = { items: {}, subQty: 0, subAmount: 0 };
+                    }
+
+                    // 紀錄品項
+                    const group = groups[currentGroupName];
+                    if (!group.items[itemName]) {
+                        group.items[itemName] = { qty: 0, price: price };
+                    }
+                    group.items[itemName].qty += 1;
+                    group.subQty += 1;
+                    group.subAmount += price;
+
+                    stats.totalQty += 1;
+                    stats.totalAmount += price;
+                }
+            }
+        });
+
+        return { groups, stats };
+    }
+
+    /* --- 畫面渲染邏輯 --- */
+    function renderResults(data) {
+        const { groups, stats } = data;
+        const container = document.getElementById('groupsContainer');
+        container.innerHTML = "";
+        
+        const sortedGroups = Object.keys(groups).sort(chineseSort);
+
+        sortedGroups.forEach(gName => {
+            const group = groups[gName];
+            if (group.subQty === 0) return;
+
+            const sortedItems = Object.keys(group.items).sort(chineseSort);
+            let rowsHtml = sortedItems.map(iName => `
+                <tr>
+                    <td class="item-col">${iName}</td>
+                    <td class="qty-col">${formatNum(group.items[iName].qty)}</td>
+                </tr>
+            `).join('');
+
+            container.innerHTML += `
+                <div class="group-section">
+                    <div class="group-header">
+                        <span>⭐ ${gName}</span>
+                        <span>共 ${formatNum(group.subQty)} 份</span>
+                    </div>
+                    <table>
+                        <thead><tr><th class="item-col">品項與備註</th><th class="qty-col">數量</th></tr></thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                    <div style="text-align:right; padding: 10px 15px; font-weight:bold; background: #fffcfd; color: #ff6b8e; font-size: 14px;">
+                        小計：$${formatNum(group.subAmount)}
+                    </div>
+                </div>`;
+        });
+
+        // 總計摘要
+        const overallMap = {};
+        Object.values(groups).forEach(g => {
+            Object.entries(g.items).forEach(([name, info]) => {
+                overallMap[name] = (overallMap[name] || 0) + info.qty;
+            });
+        });
+
+        const overallHtml = Object.keys(overallMap).sort(chineseSort).map(name => `
+            <div class="summary-row">
+                <span class="summary-item-name">${name}</span>
+                <span>${formatNum(overallMap[name])} 份</span>
+            </div>
+        `).join('');
+
+        document.getElementById('overallStats').innerHTML = overallHtml;
+        document.getElementById('totalQty').innerText = `${formatNum(stats.totalQty)} 份`;
+        document.getElementById('totalAmount').innerText = `$${formatNum(stats.totalAmount)}`;
+        document.getElementById('resultArea').style.display = 'block';
+    }
+
+    /* --- 事件處理 --- */
+    function handleProcess() {
+        const input = document.getElementById('inputData').value.trim();
+        if (!input) return showToast("請輸入訂單內容內容唷 ⭐");
+
+        const data = parseOrderData(input);
+        if (data.stats.totalQty === 0) return showToast("無法解析資料，請檢查格式唷 ⭐");
+
+        renderResults(data);
+        window.scrollTo({ top: document.getElementById('resultArea').offsetTop, behavior: 'smooth' });
+    }
+
+    function handleClear() {
+        document.getElementById('inputData').value = "";
+        document.getElementById('resultArea').style.display = 'none';
+        document.getElementById('groupsContainer').innerHTML = "";
+        showToast("內容已清空 ✨");
+    }
+
+    function handleCopy() {
+        const area = document.getElementById('resultArea');
+        if (area.style.display === 'none') return;
+
+        let text = "【訂單匯總統計結果】\n\n";
+        document.querySelectorAll('.group-section').forEach(sec => {
+            text += `${sec.querySelector('.group-header').innerText}\n`;
+            sec.querySelectorAll('tbody tr').forEach(row => {
+                const td = row.querySelectorAll('td');
+                text += `- ${td[0].innerText} * ${td[1].innerText}\n`;
+            });
+            text += `${sec.querySelector('div[style*="text-align:right"]').innerText}\n\n`;
+        });
+
+        text += "--------------------\n【全部總計摘要】\n";
+        document.querySelectorAll('#overallStats .summary-row').forEach(row => {
+            text += `${row.children[0].innerText}：${row.children[1].innerText}\n`;
+        });
+        text += `\n總份數：${document.getElementById('totalQty').innerText}\n`;
+        text += `總金額：${document.getElementById('totalAmount').innerText}`;
+
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+        showToast("已複製完整統計報表！ ✨");
+    }
+</script>
+
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>訂單金額統計助手 - 星星櫻桃版</title>
+    <title>訂單金額統計助手 - 自動分組版</title>
     <style>
         /* --- 1. 變數與基礎設定 --- */
         :root {
@@ -207,18 +207,17 @@
 <div class="container">
     <h2>訂單分組統計助手</h2>
     <div class="hint">
-        🎀 支援格式：使用 <b>++群組名稱++</b> 分組，內容為 <b>姓名-餐點 價格</b>
+        🎀 支援格式：<b>部門-餐點名稱 價格</b><br>
+        (程式會自動抓取橫線前方的文字作為分組依據)
     </div>
     
     <textarea id="inputData" placeholder="請貼上訂單資料，例如：
 
-++總管處++
-柏鋒-藥膳鍋燒泡飯 115
-怡嫻-原味鍋燒湯 120
-
-++湖美店++
-小玟-泡菜冬粉(X海鮮) 120
-孟諺-原味鍋燒湯 120"></textarea>
+總管處- 胡椒海鹽台灣鯛泰式辣雞醬 115
+總管處- 蜂蜜照燒雞腿蜂蜜芥末醬 115
+北安- 墨西哥嫩雞胸泰式辣雞醬 100
+成大- 泰式打拋豬香醇胡麻醬 115
+總管處- 胡椒海鹽雞胸香醇胡麻醬半飯 100"></textarea>
     
     <div class="btn-group">
         <button class="process-btn" onclick="handleProcess()">✨ 開始統計</button>
@@ -249,7 +248,8 @@
 
 <script>
     /* --- 常數與設定 --- */
-    const KEYWORDS_TO_SPACE = /(無糖|微糖|一分糖|二分糖|三分糖|半糖|少糖|七分糖|去冰|微冰|少冰|多冰|正常|熱|半飯)/g;
+    // 用於自動在口味或選項前加空白，方便閱讀
+    const KEYWORDS_TO_SPACE = /(無糖|微糖|一分糖|二分糖|三分糖|半糖|少糖|七分糖|去冰|微冰|少冰|多冰|正常|熱|半飯|飯少|飯多)/g;
 
     /* --- 通用工具函數 --- */
     const formatNum = (num) => num.toLocaleString();
@@ -262,54 +262,57 @@
         setTimeout(() => { t.style.display = 'none'; }, 2000);
     };
 
-    /* --- 資料處理邏輯 --- */
+    /* --- 資料處理邏輯 (核心修改處) --- */
     function parseOrderData(input) {
         const lines = input.split('\n');
-        const groups = {};
-        let currentGroupName = "未分類";
+        const groups = {}; // 結構: { '總管處': { items: { '餐點A': {qty, price} }, subQty, subAmount } }
         let stats = { totalQty: 0, totalAmount: 0 };
 
         lines.forEach(line => {
             const trimmed = line.trim();
             if (!trimmed) return;
 
-            // 檢查是否為群組標頭
-            const groupMatch = trimmed.match(/^\+\+(.*?)\+\+$/);
-            if (groupMatch) {
-                currentGroupName = groupMatch[1].trim();
-                return;
-            }
+            // 尋找第一個橫線的位置
+            const hyphenIndex = trimmed.indexOf('-');
+            
+            // 如果這行沒有橫線，或橫線在開頭/結尾，視為無效或無法分組
+            if (hyphenIndex <= 0 || hyphenIndex >= trimmed.length - 1) return;
 
-            // 檢查是否為訂單行 (包含 - )
-            if (trimmed.includes('-')) {
-                const parts = trimmed.split('-');
-                const content = parts.slice(1).join('-').trim();
-                const match = content.match(/^(.*?)(\d+)$/);
+            // 1. 抓取分組名稱 (橫線前面)
+            const groupName = trimmed.substring(0, hyphenIndex).trim();
 
-                if (match) {
-                    let itemName = match[1].trim();
-                    const price = parseInt(match[2], 10);
+            // 2. 抓取內容 (橫線後面)
+            const content = trimmed.substring(hyphenIndex + 1).trim();
 
-                    // 格式化關鍵字間隔
-                    itemName = itemName.replace(/([^\s])/ + KEYWORDS_TO_SPACE.source, '$1 $2').replace(/\s+/g, ' ');
+            // 3. 解析內容中的 餐點 與 價格
+            // Regex: 抓取前面的文字(非貪婪) 與 最後面的數字
+            const match = content.match(/^(.*?)(\d+)$/);
 
-                    // 初始化群組
-                    if (!groups[currentGroupName]) {
-                        groups[currentGroupName] = { items: {}, subQty: 0, subAmount: 0 };
-                    }
+            if (match) {
+                let itemName = match[1].trim();
+                const price = parseInt(match[2], 10);
 
-                    // 紀錄品項
-                    const group = groups[currentGroupName];
-                    if (!group.items[itemName]) {
-                        group.items[itemName] = { qty: 0, price: price };
-                    }
-                    group.items[itemName].qty += 1;
-                    group.subQty += 1;
-                    group.subAmount += price;
+                // 格式化關鍵字間隔 (優化顯示)
+                itemName = itemName.replace(/([^\s])/ + KEYWORDS_TO_SPACE.source, '$1 $2').replace(/\s+/g, ' ');
 
-                    stats.totalQty += 1;
-                    stats.totalAmount += price;
+                // 初始化群組 (如果該群組還沒出現過)
+                if (!groups[groupName]) {
+                    groups[groupName] = { items: {}, subQty: 0, subAmount: 0 };
                 }
+
+                // 紀錄品項
+                const group = groups[groupName];
+                if (!group.items[itemName]) {
+                    group.items[itemName] = { qty: 0, price: price };
+                }
+                
+                // 累加數據
+                group.items[itemName].qty += 1;
+                group.subQty += 1;
+                group.subAmount += price;
+
+                stats.totalQty += 1;
+                stats.totalAmount += price;
             }
         });
 
@@ -322,6 +325,7 @@
         const container = document.getElementById('groupsContainer');
         container.innerHTML = "";
         
+        // 依照群組名稱排序 (中文排序)
         const sortedGroups = Object.keys(groups).sort(chineseSort);
 
         sortedGroups.forEach(gName => {
@@ -382,7 +386,10 @@
         if (data.stats.totalQty === 0) return showToast("無法解析資料，請檢查格式唷 ⭐");
 
         renderResults(data);
-        window.scrollTo({ top: document.getElementById('resultArea').offsetTop, behavior: 'smooth' });
+        // 平滑捲動到結果區
+        setTimeout(() => {
+             window.scrollTo({ top: document.getElementById('resultArea').offsetTop - 20, behavior: 'smooth' });
+        }, 100);
     }
 
     function handleClear() {
